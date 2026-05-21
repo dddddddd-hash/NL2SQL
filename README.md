@@ -23,6 +23,7 @@ HomeRAG NL2SQL 是一个面向数据分析场景的自然语言转 SQL 项目。
 - MySQL / PyMySQL
 - Jieba
 - Matplotlib
+<img width="795" height="1190" alt="3661c78c66534fb553858c93de707d9f" src="https://github.com/user-attachments/assets/2a45ecf7-b872-4eb8-979a-e8ea093d758a" />
 
 ## 项目结构
 
