@@ -154,8 +154,3 @@ python eval/run_eval.py
 
 评估结果会输出到 `reports/eval/`，包括原始结果、CSV、Markdown、HTML 和指标图表。`reports/` 已在 `.gitignore` 中排除。
 
-## 上传 GitHub 前检查
-
-- 不要提交 `.env`、模型缓存、评估报告和 `__pycache__`
-- 确认数据库密码、API Key 等敏感信息已通过环境变量配置
-- 如需公开仓库，建议检查 `config/settings.py` 中的默认数据库配置是否适合公开
