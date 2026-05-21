@@ -1,0 +1,33 @@
+# Core
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+pydantic==2.8.0
+pydantic-settings==2.4.0
+python-dotenv==1.0.1
+
+# LangChain & LangGraph
+langchain
+langchain-openai
+langgraph
+
+# DeepSeek / OpenAI SDK
+openai==1.50.0
+
+# Vector DB
+qdrant-client==1.11.0
+
+# MySQL
+pymysql==1.1.1
+cryptography==43.0.0
+
+# NLP
+jieba==0.42.1
+
+# Local embedding
+sentence-transformers==3.1.0
+torch==2.4.0                  # CPU 版本，GPU 用户可参考 pytorch.org 安装
+numpy==1.26.4
+
+# Evaluation & Visualization
+requests==2.32.3
+matplotlib==3.9.2

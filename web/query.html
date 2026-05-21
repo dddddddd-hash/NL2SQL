@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HomeRAG 查询</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #5b6cff;
+      --border: #e5e7eb;
+      --card: #ffffff;
+      --ok: #16a34a;
+      --err: #dc2626;
+      --pending: #d1d5db;
+      --shadow: 0 8px 26px rgba(17, 24, 39, 0.06);
+      --radius: 16px;
+      --panel-title: #374151;
+      --table-even: #f8fafc;
+      --table-divider: #eef2f7;
+      --sql-bg: #fafbff;
+      --code-bg: #ffffff;
+      --answer-text: #374151;
+      --input-placeholder: #9ca3af;
+      --step-text: #4b5563;
+      --dot-ring: #f3f4f6;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1020;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --primary: #7c8cff;
+      --border: #273047;
+      --card: #11182b;
+      --ok: #22c55e;
+      --err: #f87171;
+      --pending: #475569;
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      --panel-title: #d1d5db;
+      --table-even: #0f172a;
+      --table-divider: #1f2937;
+      --sql-bg: #0f172a;
+      --code-bg: #111827;
+      --answer-text: #d1d5db;
+      --input-placeholder: #6b7280;
+      --step-text: #cbd5e1;
+      --dot-ring: #1f2937;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.7;
+    }
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: 10vh 18px 40px;
+    }
+    .title {
+      text-align: center;
+      font-size: clamp(32px, 7vw, 56px);
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      margin: 0 0 20px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 6px;
+    }
+    .theme-toggle {
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      transition: opacity .2s ease;
+    }
+    .theme-toggle:hover { opacity: 0.88; }
+    .theme-toggle:active { opacity: 0.75; }
+    .theme-icon {
+      margin-right: 6px;
+      font-size: 12px;
+    }
+    .query-wrap {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      padding: 8px 8px 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .query-input {
+      border: none;
+      outline: none;
+      width: 100%;
+      font-size: 17px;
+      line-height: 1.5;
+      color: #111827;
+      background: transparent;
+      padding: 8px 0;
+    }
+    .query-input::placeholder { color: #9ca3af; }
+    .send-btn {
+      border: none;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      transition: opacity .2s ease;
+      flex-shrink: 0;
+    }
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 10px;
+      text-align: center;
+    }
+    .error {
+      color: var(--err);
+      font-size: 13px;
+      margin-top: 8px;
+      min-height: 20px;
+      text-align: left;
+      padding-left: 6px;
+    }
+
+    .panel {
+      margin-top: 24px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .panel h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--panel-title);
+    }
+
+    .steps { display: grid; gap: 10px; }
+    .step {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      opacity: 0;
+      transform: translateY(6px);
+      animation: fadeIn .35s ease forwards;
+    }
+    @keyframes fadeIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-top: 8px;
+      background: var(--pending);
+      box-shadow: 0 0 0 2px var(--dot-ring);
+      flex-shrink: 0;
+    }
+    .dot.running { background: var(--primary); }
+    .dot.success { background: var(--ok); }
+    .dot.error { background: var(--err); }
+    .step-text {
+      color: var(--step-text);
+      font-size: 14px;
+    }
+
+    .answer {
+      font-size: clamp(15px, 1.65vw, 18px);
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      white-space: pre-wrap;
+      min-height: 42px;
+      color: var(--answer-text);
+    }
+    .answer p {
+      margin: 0 0 10px 0;
+    }
+    .answer ul {
+      margin: 6px 0 12px 0;
+      padding-left: 22px;
+    }
+    .answer li {
+      margin: 4px 0;
+    }
+
+    details.sql-block {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--sql-bg);
+    }
+    details.sql-block summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 12px 14px;
+      color: #374151;
+      font-size: 14px;
+      user-select: none;
+    }
+    details.sql-block summary::-webkit-details-marker { display: none; }
+    pre {
+      margin: 0;
+      padding: 14px;
+      overflow: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      border-top: 1px solid var(--border);
+      color: var(--text);
+      background: var(--code-bg);
+    }
+    .sql-keyword { color: #4f46e5; font-weight: 600; }
+    .sql-ident { color: #0f766e; }
+    .sql-string { color: #b45309; }
+
+    .table-wrap { overflow: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border: none;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+    thead th {
+      color: var(--panel-title);
+      font-weight: 600;
+      border-bottom: 1px solid var(--table-divider);
+    }
+    tbody tr:nth-child(even) { background: var(--table-even); }
+    tbody td { color: var(--step-text); }
+
+    #themeTransition {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0;
+      clip-path: circle(0px at var(--x, 50%) var(--y, 50%));
+      transition: clip-path .56s cubic-bezier(0.22, 1, 0.36, 1), opacity .2s ease;
+    }
+    #themeTransition.active {
+      opacity: 1;
+      clip-path: circle(var(--r, 0px) at var(--x, 50%) var(--y, 50%));
+    }
+
+    .hidden { display: none; }
+    
+    @media (max-width: 640px) {
+      .panel { padding: 14px; }
+      th, td { padding: 8px 10px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="themeTransition"></div>
+  <main class="page">
+    <div class="topbar">
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="切换主题">
+        <span id="themeIcon" class="theme-icon">☀</span>
+        <span id="themeText">浅色</span>
+      </button>
+    </div>
+    <h1 class="title">HomeRAG</h1>
+    <div class="query-wrap">
+      <input
+        id="queryInput"
+        class="query-input"
+        placeholder="试试：统计哪一年的销售额最高"
+        autocomplete="off"
+      />
+      <button id="sendBtn" class="send-btn" aria-label="发送查询">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M4 12h14m0 0-5-5m5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="hint">Enter 发送，Shift + Enter 换行</div>
+    <div id="errorText" class="error"></div>
+
+    <section id="stepsPanel" class="panel hidden">
+      <h3>执行过程</h3>
+      <div id="stepsList" class="steps"></div>
+    </section>
+
+    <section id="answerPanel" class="panel hidden">
+      <h3>回答</h3>
+      <div id="answerText" class="answer"></div>
+    </section>
+
+    <section id="sqlPanel" class="panel hidden">
+      <h3>SQL</h3>
+      <details class="sql-block">
+        <summary>点击展开 SQL 语句</summary>
+        <pre><code id="sqlCode"></code></pre>
+      </details>
+    </section>
+
+    <section id="tablePanel" class="panel hidden">
+      <h3>数据预览（最多 20 条）</h3>
+      <div id="tableWrap" class="table-wrap"></div>
+    </section>
+  </main>
+
+  <script>
+    const queryInput = document.getElementById("queryInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const errorText = document.getElementById("errorText");
+    const stepsPanel = document.getElementById("stepsPanel");
+    const stepsList = document.getElementById("stepsList");
+    const answerPanel = document.getElementById("answerPanel");
+    const answerText = document.getElementById("answerText");
+    const sqlPanel = document.getElementById("sqlPanel");
+    const sqlCode = document.getElementById("sqlCode");
+    const tablePanel = document.getElementById("tablePanel");
+    const tableWrap = document.getElementById("tableWrap");
+    const themeToggle = document.getElementById("themeToggle");
+    const themeIcon = document.getElementById("themeIcon");
+    const themeText = document.getElementById("themeText");
+    const themeTransition = document.getElementById("themeTransition");
+
+    const stepLabelMap = {
+      keyword_extraction: "关键词提取",
+      vector_retrieval: "向量检索",
+      sql_generation: "SQL 生成",
+      sql_validation: "SQL 校验",
+      sql_execution: "SQL 执行",
+      answer_generation: "回答生成",
+      error_handler: "错误处理"
+    };
+
+    let eventSource = null;
+    let stepNodes = {};
+    let streamedAnswer = "";
+    let currentTheme = "light";
+
+    function setLoading(loading) {
+      queryInput.disabled = loading;
+      sendBtn.disabled = loading;
+    }
+
+    function resetUI() {
+      errorText.textContent = "";
+      stepsList.innerHTML = "";
+      stepNodes = {};
+      streamedAnswer = "";
+      answerText.textContent = "";
+      sqlCode.innerHTML = "";
+      tableWrap.innerHTML = "";
+      stepsPanel.classList.add("hidden");
+      answerPanel.classList.add("hidden");
+      sqlPanel.classList.add("hidden");
+      tablePanel.classList.add("hidden");
+    }
+
+    function addStep(node, message) {
+      if (!stepNodes[node]) {
+        const row = document.createElement("div");
+        row.className = "step";
+        row.innerHTML = `
+          <span class="dot running"></span>
+          <div class="step-text"><strong>${stepLabelMap[node] || node}</strong>：${message || "处理中..."}</div>
+        `;
+        stepsList.appendChild(row);
+        stepNodes[node] = row;
+      } else {
+        const text = stepNodes[node].querySelector(".step-text");
+        text.innerHTML = `<strong>${stepLabelMap[node] || node}</strong>：${message || "处理中..."}`;
+        setStepStatus(node, "running");
+      }
+    }
+
+    function setStepStatus(node, status) {
+      const row = stepNodes[node];
+      if (!row) return;
+      const dot = row.querySelector(".dot");
+      dot.classList.remove("running", "success", "error");
+      dot.classList.add(status);
+    }
+
+    function escapeHTML(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function renderAnswerMarkdown(text) {
+      const safe = escapeHTML(text || "");
+      const lines = safe.split(/\r?\n/);
+      const html = [];
+      let inList = false;
+
+      const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+      for (const lineRaw of lines) {
+        const line = lineRaw.trimEnd();
+        if (!line.trim()) {
+          if (inList) {
+            html.push("</ul>");
+            inList = false;
+          }
+          continue;
+        }
+
+        if (/^\s*-\s+/.test(line)) {
+          if (!inList) {
+            html.push("<ul>");
+            inList = true;
+          }
+          const item = line.replace(/^\s*-\s+/, "");
+          html.push(`<li>${inline(item)}</li>`);
+        } else {
+          if (inList) {
+            html.push("</ul>");
+            inList = false;
+          }
+          html.push(`<p>${inline(line)}</p>`);
+        }
+      }
+
+      if (inList) {
+        html.push("</ul>");
+      }
+      return html.join("");
+    }
+
+    function getInitialTheme() {
+      const saved = localStorage.getItem("homeRagTheme");
+      if (saved === "light" || saved === "dark") {
+        return saved;
+      }
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+
+    function applyTheme(theme) {
+      currentTheme = theme;
+      document.documentElement.setAttribute("data-theme", theme);
+      themeIcon.textContent = theme === "dark" ? "🌙" : "☀";
+      themeText.textContent = theme === "dark" ? "深色" : "浅色";
+      localStorage.setItem("homeRagTheme", theme);
+    }
+
+    function switchThemeWithRipple(nextTheme, originEl) {
+      const rect = originEl.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const maxRadius = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y)
+      );
+
+      themeTransition.style.setProperty("--x", `${x}px`);
+      themeTransition.style.setProperty("--y", `${y}px`);
+      themeTransition.style.setProperty("--r", "0px");
+      themeTransition.style.background = nextTheme === "dark" ? "#0b1020" : "#ffffff";
+      themeTransition.classList.add("active");
+
+      requestAnimationFrame(() => {
+        themeTransition.style.setProperty("--r", `${maxRadius}px`);
+      });
+
+      const onEnd = () => {
+        applyTheme(nextTheme);
+        themeTransition.classList.remove("active");
+        themeTransition.style.setProperty("--r", "0px");
+        themeTransition.removeEventListener("transitionend", onEnd);
+      };
+      themeTransition.addEventListener("transitionend", onEnd);
+    }
+
+    function highlightSQL(sql) {
+      const escaped = escapeHTML(sql);
+      const placeholders = [];
+      let protectedText = escaped;
+
+      protectedText = protectedText.replace(/`[^`]*`|'[^']*'/g, (match) => {
+        const index = placeholders.length;
+        placeholders.push(match);
+        return `__SQL_TOKEN_${index}__`;
+      });
+
+      const keywordPattern = /\b(SELECT|FROM|WHERE|GROUP\s+BY|ORDER\s+BY|LIMIT|AND|OR|AS|DESC|ASC|COUNT|SUM|AVG|MAX|MIN|HAVING|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|ON)\b/gi;
+      protectedText = protectedText.replace(
+        keywordPattern,
+        "<span class='sql-keyword'>$1</span>"
+      );
+
+      protectedText = protectedText.replace(/__SQL_TOKEN_(\d+)__/g, (_, idx) => {
+        const raw = placeholders[Number(idx)] || "";
+        if (raw.startsWith("`")) {
+          return `<span class='sql-ident'>${raw}</span>`;
+        }
+        return `<span class='sql-string'>${raw}</span>`;
+      });
+
+      return protectedText;
+    }
+
+    function renderTable(rows) {
+      if (!Array.isArray(rows) || rows.length === 0) {
+        tableWrap.innerHTML = "<div style='color:#6b7280;font-size:14px;'>无可展示数据</div>";
+        return;
+      }
+      const columns = Object.keys(rows[0]);
+      const thead = "<thead><tr>" + columns.map(c => `<th>${escapeHTML(c)}</th>`).join("") + "</tr></thead>";
+      const tbody = "<tbody>" + rows.map(row => {
+        return "<tr>" + columns.map(c => `<td>${escapeHTML(row[c])}</td>`).join("") + "</tr>";
+      }).join("") + "</tbody>";
+      tableWrap.innerHTML = `<table>${thead}${tbody}</table>`;
+    }
+
+    function closeSSE() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+    }
+
+    function runQuery() {
+      const q = queryInput.value.trim();
+      if (!q) {
+        errorText.textContent = "请输入查询内容";
+        return;
+      }
+
+      resetUI();
+      setLoading(true);
+      stepsPanel.classList.remove("hidden");
+      answerPanel.classList.remove("hidden");
+
+      const sessionId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+      const url = `/api/v1/query/stream?q=${encodeURIComponent(q)}&session_id=${encodeURIComponent(sessionId)}`;
+      closeSSE();
+      eventSource = new EventSource(url);
+
+      eventSource.onmessage = (event) => {
+        if (event.data === "[DONE]") {
+          setLoading(false);
+          closeSSE();
+          return;
+        }
+
+        try {
+          const payload = JSON.parse(event.data);
+          const type = payload.type;
+          const data = payload.data || {};
+
+          if (type === "step") {
+            addStep(data.node, data.message);
+            if (data.node === "sql_validation") {
+              setStepStatus(data.node, data.valid ? "success" : "error");
+            } else if (data.node === "error_handler") {
+              setStepStatus(data.node, "error");
+            } else {
+              setStepStatus(data.node, "success");
+            }
+
+            if (data.node === "sql_execution" && Array.isArray(data.results_preview)) {
+              tablePanel.classList.remove("hidden");
+              renderTable(data.results_preview);
+            }
+          }
+
+          if (type === "sql_generated" && data.sql) {
+            sqlPanel.classList.remove("hidden");
+            sqlCode.innerHTML = highlightSQL(data.sql);
+          }
+
+          if (type === "answer_stream" && typeof data.char === "string") {
+            streamedAnswer += data.char;
+            answerText.innerHTML = renderAnswerMarkdown(streamedAnswer);
+          }
+
+          if (type === "complete") {
+            if (data.sql) {
+              sqlPanel.classList.remove("hidden");
+              sqlCode.innerHTML = highlightSQL(data.sql);
+            }
+            if (Array.isArray(data.results_preview)) {
+              tablePanel.classList.remove("hidden");
+              renderTable(data.results_preview);
+            }
+          }
+
+          if (type === "error") {
+            errorText.textContent = data.message || "请求失败，请稍后重试";
+            setLoading(false);
+            closeSSE();
+          }
+        } catch (err) {
+          errorText.textContent = "响应解析失败";
+          setLoading(false);
+          closeSSE();
+        }
+      };
+
+      eventSource.onerror = () => {
+        errorText.textContent = "连接中断，请检查服务是否运行";
+        setLoading(false);
+        closeSSE();
+      };
+    }
+
+    sendBtn.addEventListener("click", runQuery);
+    queryInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        runQuery();
+      }
+    });
+
+    themeToggle.addEventListener("click", () => {
+      const next = currentTheme === "dark" ? "light" : "dark";
+      switchThemeWithRipple(next, themeToggle);
+    });
+
+    applyTheme(getInitialTheme());
+  </script>
+</body>
+</html>
